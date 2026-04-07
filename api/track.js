@@ -6,10 +6,17 @@ export default async function handler(req, res) {
   const userAgent = req.headers['user-agent'] || 'unknown';
   const timestamp = new Date().toISOString();
 
-  // 2. Filter out Vercel's internal bots so they don't fill your sheet with trash
+  // 2. Filter out Vercel's internal bots
   if (userAgent.includes('vercel-favicon')) {
     return res.status(204).end();
   }
+
+  // --- NEW: THE LIVE LOGGER (Shows up in Vercel Dashboard) ---
+  console.log("------------------------------------------");
+  console.log(`🎯 HIT DETECTED: ${timestamp}`);
+  console.log(`🌐 IP: ${ip}`);
+  console.log(`🔍 UA: ${userAgent}`);
+  console.log("------------------------------------------");
 
   // 3. YOUR GOOGLE SHEETS WEB APP URL
   const googleUrl = "https://script.google.com/macros/s/AKfycbxGBOuTmWNOiewczAfCmlNmn47-MA_cA3lnZk0JRmlAXlNG95w2AFe3m6bhl_9A4FeG/exec";
@@ -21,20 +28,31 @@ export default async function handler(req, res) {
   });
 
   // 5. Send the data to your Google Sheet "Logbook"
-  // We don't use 'await' here so the pixel is served instantly to the target
-  const googleReq = https.request(googleUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    }
-  });
+  // We use a Promise wrapper to make sure Vercel doesn't kill the request too early
+  try {
+    await new Promise((resolve) => {
+      const googleReq = https.request(googleUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }, (googleRes) => {
+        // Log the status to Vercel so you know if Google accepted it
+        console.log(`[GOOGLE STATUS]: ${googleRes.statusCode}`);
+        resolve();
+      });
 
-  googleReq.on('error', (e) => {
-    console.error("Failed to log to Google Sheets:", e.message);
-  });
+      googleReq.on('error', (e) => {
+        console.error("Failed to log to Google Sheets:", e.message);
+        resolve();
+      });
 
-  googleReq.write(payload);
-  googleReq.end();
+      googleReq.write(payload);
+      googleReq.end();
+    });
+  } catch (err) {
+    console.error("Critical Error sending to Google:", err);
+  }
 
   // 6. Serve the 1x1 Invisible Tracking Pixel
   const pixel = Buffer.from(
@@ -43,7 +61,6 @@ export default async function handler(req, res) {
   );
 
   res.setHeader('Content-Type', 'image/png');
-  // This ensures the browser doesn't "remember" the image and skip the log next time
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   
   res.status(200).send(pixel);
