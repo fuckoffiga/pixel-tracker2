@@ -1,61 +1,50 @@
 const https = require('https');
 
 export default async function handler(req, res) {
-  // 1. Collect Data
+  // 1. Capture the "Who" and "Where"
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
   const userAgent = req.headers['user-agent'] || 'unknown';
   const timestamp = new Date().toISOString();
-  
-  // Skip Vercel's own favicon crawler to avoid spam
+
+  // 2. Filter out Vercel's internal bots so they don't fill your sheet with trash
   if (userAgent.includes('vercel-favicon')) {
     return res.status(204).end();
   }
 
-  // Parse for the Dashboard
-  const browser = userAgent.includes('Chrome') ? 'Chrome' : userAgent.includes('Firefox') ? 'Firefox' : userAgent.includes('Safari') ? 'Safari' : userAgent.includes('Edge') ? 'Edge' : 'Other';
-  const os = userAgent.includes('Windows') ? 'Windows' : userAgent.includes('Mac') ? 'MacOS' : userAgent.includes('Linux') ? 'Linux' : userAgent.includes('Android') ? 'Android' : userAgent.includes('iPhone') ? 'iOS' : 'Other';
+  // 3. YOUR GOOGLE SHEETS WEB APP URL
+  const googleUrl = "https://script.google.com/macros/s/AKfycbxGBOuTmWNOiewczAfCmlNmn47-MA_cA3lnZk0JRmlAXlNG95w2AFe3m6bhl_9A4FeG/exec";
 
-  const discordPayload = JSON.stringify({
-    content: `🎯 **Hit Detected!**\n**IP:** \`${ip}\` \n**Device:** \`${os} / ${browser}\` \n**Time:** \`${timestamp}\``
+  // 4. Create the "Log Entry" package
+  const payload = JSON.stringify({
+    ip: ip,
+    ua: userAgent
   });
 
-  const webhookUrl = "https://discord.com/api/webhooks/1491153564159184947/_NO3pSdteBLLJN26oyhTQJiJaZcjl2s_-k82ALTThl65jrZePzwhaWYqd3iiD4uvi0T_";
+  // 5. Send the data to your Google Sheet "Logbook"
+  // We don't use 'await' here so the pixel is served instantly to the target
+  const googleReq = https.request(googleUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  });
 
-  // 2. THE SYNC FIX: We MUST await this to ensure it sends
-  console.log(`[SYSTEM] Attempting Discord Ping for IP: ${ip}`);
+  googleReq.on('error', (e) => {
+    console.error("Failed to log to Google Sheets:", e.message);
+  });
 
-  try {
-    await new Promise((resolve, reject) => {
-      const discordReq = https.request(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(discordPayload),
-        }
-      }, (discordRes) => {
-        console.log(`[DISCORD RESPONSE] Status: ${discordRes.statusCode}`);
-        resolve();
-      });
+  googleReq.write(payload);
+  googleReq.end();
 
-      discordReq.on('error', (err) => {
-        console.error("[DISCORD ERROR]", err.message);
-        resolve(); // Resolve anyway to send the pixel
-      });
-
-      discordReq.write(discordPayload);
-      discordReq.end();
-    });
-  } catch (e) {
-    console.error("[CRITICAL ERROR]", e);
-  }
-
-  // 3. Return the 1x1 Pixel
+  // 6. Serve the 1x1 Invisible Tracking Pixel
   const pixel = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8Xw8AAoMBgEwh3JQAAAAASUVORK5CYII=",
     "base64"
   );
 
   res.setHeader('Content-Type', 'image/png');
+  // This ensures the browser doesn't "remember" the image and skip the log next time
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  
   res.status(200).send(pixel);
 }
