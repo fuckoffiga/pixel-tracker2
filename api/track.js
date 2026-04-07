@@ -1,45 +1,54 @@
 export default async function handler(req, res) {
-  // 1. Capture the Data
+  // 1. COLLECT VISITOR DATA
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
   const userAgent = req.headers['user-agent'] || 'unknown';
   const timestamp = new Date().toISOString();
 
-  // 2. Skip Vercel's internal bots
+  // 2. FILTER OUT VERCEL BOTS
   if (userAgent.includes('vercel-favicon')) {
     return res.status(204).end();
   }
 
-  // 3. LOG TO VERCEL DASHBOARD (So you see it live)
+  // 3. LIVE VERCEL LOGGING (Visible in your Vercel Dashboard)
   console.log("------------------------------------------");
   console.log(`🎯 HIT DETECTED: ${timestamp}`);
   console.log(`🌐 IP: ${ip}`);
   console.log(`🔍 UA: ${userAgent}`);
   console.log("------------------------------------------");
 
-  // 4. YOUR GOOGLE SHEETS WEB APP URL
-  const googleUrl = "https://script.google.com/macros/s/AKfycbxGBOuTmWNOiewczAfCmlNmn47-MA_cA3lnZk0JRmlAXlNG95w2AFe3m6bhl_9A4FeG/exec";
+  // 4. SUPABASE CONFIGURATION
+  const SUPABASE_URL = "https://lpgvvvvhyrntagpwcaix.supabase.co"; 
+  const SUPABASE_KEY = "sb_secret_vOkIFPygZ2hFqYB2g8e5qw_JfDCn76W";
 
-  // 5. SEND TO GOOGLE SHEETS
+  // 5. PERMANENT DATABASE LOGGING
   try {
-    const response = await fetch(googleUrl, {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/logs`, {
       method: 'POST',
       headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
         'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
       },
       body: JSON.stringify({
-        ip: ip,
-        ua: userAgent
+        ip: ip,                 // Matches your 'ip' column
+        user_agent: userAgent,  // Matches your 'user_agent' column
+        date_and_time: timestamp // Matches your 'date_and_time' column
       })
     });
 
-    // This will print "200" in your Vercel logs if Google accepted it
-    console.log(`[GOOGLE RESPONSE] Status: ${response.status}`);
+    if (response.ok) {
+      console.log(`[DB SUCCESS] Status: ${response.status}`);
+    } else {
+      const errorText = await response.text();
+      console.error(`[DB FAILED] ${response.status}: ${errorText}`);
+    }
     
   } catch (err) {
-    console.error("[CRITICAL ERROR] Failed to reach Google Sheets:", err.message);
+    console.error("[CRITICAL DB ERROR]:", err.message);
   }
 
-  // 6. SERVE THE 1x1 PIXEL
+  // 6. SERVE THE 1x1 INVISIBLE PIXEL
   const pixel = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8Xw8AAoMBgEwh3JQAAAAASUVORK5CYII=",
     "base64"
