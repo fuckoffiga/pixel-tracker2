@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     return res.status(204).end();
   }
 
-  // 3. LIVE VERCEL LOGGING (Visible in your Vercel Dashboard)
+  // 3. LIVE VERCEL LOGGING
   console.log("------------------------------------------");
   console.log(`🎯 HIT DETECTED: ${timestamp}`);
   console.log(`🌐 IP: ${ip}`);
@@ -22,7 +22,8 @@ export default async function handler(req, res) {
 
   // 5. PERMANENT DATABASE LOGGING
   try {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/logs`, {
+    // NOTICE: The URL now ends in /LOGGER to match your table name
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/LOGGER`, {
       method: 'POST',
       headers: {
         'apikey': SUPABASE_KEY,
@@ -31,9 +32,9 @@ export default async function handler(req, res) {
         'Prefer': 'return=minimal'
       },
       body: JSON.stringify({
-        ip: ip,                 // Matches your 'ip' column
-        user_agent: userAgent,  // Matches your 'user_agent' column
-        date_and_time: timestamp // Matches your 'date_and_time' column
+        ip: ip,                 
+        user_agent: userAgent,  
+        date_and_time: timestamp 
       })
     });
 
