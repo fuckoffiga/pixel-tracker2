@@ -7,7 +7,7 @@ export default function handler(req, res) {
     req.socket.remoteAddress ||
     'unknown';
 
-  // 2. Get User-Agent and Parse Browser/OS (Your original logic)
+  // 2. Get User-Agent and Parse Browser/OS
   const userAgent = req.headers['user-agent'] || 'unknown';
 
   const browser = userAgent.includes('Chrome')
@@ -35,34 +35,30 @@ export default function handler(req, res) {
   const timestamp = new Date().toISOString();
 
   // 3. Prepare the message for Discord
-  const discordData = JSON.stringify({
-    content: `🎯 **NEW LOG**\n**Time:** \`${timestamp}\` \n**IP Address:** \`${ip}\` \n**Operating System:** \`${os}\` \n**Browser:** \`${browser}\` \n**Full User-Agent:** \` ${userAgent} \``
+  const discordPayload = JSON.stringify({
+    content: `🎯 **Association Alert: New Hit Detected!**\n**Time:** \`${timestamp}\` \n**IP Address:** \`${ip}\` \n**Operating System:** \`${os}\` \n**Browser:** \`${browser}\` \n**User-Agent:** \` ${userAgent} \``
   });
 
-  // 4. Send to Discord (Replace the URL below with your actual Webhook URL)
-  const webhookUrl = "https://discord.com/api/webhooks/1491153564159184947/_NO3pSdteBLLJN26oyhTQJiJaZcjl2s_-k82ALTThl65jrZePzwhaWYqd3iiD4uvi0T_"; 
+  // 4. THE FIX: The "Safe" Webhook URL (passed directly to https.request)
+  const webhookUrl = "https://discord.com/api/webhooks/1491153564159184947/_NO3pSdteBLLJN26oyhTQJiJaZcjl2s_-k82ALTThl65jrZePzwhaWYqd3iiD4uvi0T_";
 
-  // Standard Node.js HTTPS request configuration
-  const url = new URL(webhookUrl);
-  const options = {
-    hostname: url.hostname,
-    path: url.pathname,
+  const discordReq = https.request(webhookUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(discordData),
-    },
-  };
+      'Content-Length': Buffer.byteLength(discordPayload),
+    }
+  });
 
-  // Execute the Discord Ping
-  const discordReq = https.request(options);
+  // Handle any potential connection errors so the function doesn't crash
   discordReq.on('error', (error) => {
     console.error('Discord Webhook Error:', error);
   });
-  discordReq.write(discordData);
+
+  discordReq.write(discordPayload);
   discordReq.end();
 
-  // 5. Return the 1x1 transparent pixel (Your original image)
+  // 5. Return the 1x1 transparent pixel (PNG format)
   const pixel = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8Xw8AAoMBgEwh3JQAAAAASUVORK5CYII=",
     "base64"
